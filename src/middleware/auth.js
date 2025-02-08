@@ -15,10 +15,22 @@ export const authenticate = async (req, res, next) => {
     const decodedToken = await auth().verifyIdToken(token);
     
     // Get user from database
-    const user = await User.findOne({ firebaseUid: decodedToken.uid });
+    let user = await User.findOne({ firebaseUid: decodedToken.uid });
     
+    // If user doesn't exist in MongoDB but exists in Firebase, create them
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      // Get user details from Firebase
+      const firebaseUser = await auth().getUser(decodedToken.uid);
+      
+      // Create user in MongoDB
+      user = new User({
+        firebaseUid: decodedToken.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+        isAdmin: firebaseUser.email === 'admin@kad.com' // Make admin@kad.com an admin
+      });
+      
+      await user.save();
     }
 
     // Attach user to request object
