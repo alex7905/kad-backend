@@ -58,24 +58,50 @@ app.use('/api/users', authenticate, userRoutes);
 app.use('/api/questionnaire', authenticate, questionnaireRoutes);
 app.use('/api/admin', authenticate, adminRoutes);
 
-// Error handling
-app.use(errorHandler);
+// Start the server first
+const port = process.env.PORT || 5000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on port ${port}`);
+});
 
-// Health check endpoint
+// Health check endpoint that doesn't depend on DB
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-    // Start server only after successful database connection
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server is running on port ${PORT}`);
+// Database connection with retry logic
+const connectDB = async (retryCount = 0, maxRetries = 5) => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4
     });
-  })
-  .catch((error) => {
+    console.log('Connected to MongoDB');
+  } catch (error) {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
-  }); 
+    if (retryCount < maxRetries) {
+      const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+      console.log(`Retrying connection... Attempt ${retryCount + 1} of ${maxRetries} in ${retryDelay/1000} seconds`);
+      setTimeout(() => connectDB(retryCount + 1), retryDelay);
+    }
+  }
+};
+
+// Handle MongoDB connection events
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected! Attempting to reconnect...');
+  setTimeout(connectDB, 5000);
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err);
+  setTimeout(connectDB, 5000);
+});
+
+connectDB();
+
+// Error handling must be last
+app.use(errorHandler); 
