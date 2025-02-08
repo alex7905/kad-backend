@@ -61,20 +61,21 @@ app.use('/api/admin', authenticate, adminRoutes);
 // Error handling
 app.use(errorHandler);
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
+    // Start server only after successful database connection
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server is running on port ${PORT}`);
     });
   })
   .catch((error) => {
     console.error('MongoDB connection error:', error);
     process.exit(1);
-  });
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-}); 
+  }); 
