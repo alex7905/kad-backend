@@ -11,8 +11,13 @@ let firebaseApp;
 export const initializeFirebase = () => {
   try {
     if (!firebaseApp) {
+      // Get the Firebase Admin SDK credentials from environment variable
+      const serviceAccount = process.env.FIREBASE_ADMIN_SDK_JSON 
+        ? JSON.parse(process.env.FIREBASE_ADMIN_SDK_JSON)
+        : require(process.env.FIREBASE_ADMIN_SDK_PATH);
+
       firebaseApp = initializeApp({
-        credential: cert(process.env.FIREBASE_ADMIN_SDK_PATH),
+        credential: cert(serviceAccount),
         databaseURL: process.env.FIREBASE_DATABASE_URL
       });
       
